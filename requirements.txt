@@ -1,0 +1,10 @@
+# LinkedIn AI Daily Post Automation — Dependencies
+# Install with: pip install -r requirements.txt
+# Versions confirmed compatible with Python 3.13 (Anaconda)
+
+requests==2.31.0        # HTTP client for all API calls (already installed)
+schedule==1.2.1         # Daily job scheduler
+gspread==6.0.2          # Google Sheets read/write
+google-auth==2.50.0     # Google Service Account authentication (replaces oauth2client on Python 3.13+)
+google-auth-oauthlib    # OAuth2 helpers for google-auth
+Pillow==11.1.0          # Image processing — 10.x does not build on Python 3.13
