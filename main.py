@@ -666,12 +666,20 @@ def run_workflow():
 #   ⚠️ Do NOT commit with run_workflow() uncommented.
 # ─────────────────────────────────────────────────────────────────────────────
 if __name__ == "__main__":
-    log.info(f"🕙 Scheduler started — will post daily at {config.POST_TIME}")
-    schedule.every().day.at(config.POST_TIME).do(run_workflow)
+    import sys
+    run_now = os.environ.get("RUN_NOW", "").lower() == "true" or "--now" in sys.argv
 
-    # ── Uncomment ONLY for immediate testing, then re-comment before committing ──
-    # run_workflow()
+    if run_now:
+        log.info("🚀 Running workflow immediately (one-off run)...")
+        run_workflow()
+        log.info("🏁 One-off workflow execution completed.")
+    else:
+        log.info(f"🕙 Scheduler started — will post daily at {config.POST_TIME}")
+        schedule.every().day.at(config.POST_TIME).do(run_workflow)
 
-    while True:
-        schedule.run_pending()
-        time.sleep(60)  # Check every 60 seconds (not 1 second — avoids wasting CPU)
+        # ── Uncomment ONLY for immediate testing, then re-comment before committing ──
+        # run_workflow()
+
+        while True:
+            schedule.run_pending()
+            time.sleep(60)  # Check every 60 seconds (not 1 second — avoids wasting CPU)
