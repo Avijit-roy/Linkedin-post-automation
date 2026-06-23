@@ -14,11 +14,12 @@ flowchart TD
     C -->|Already Posted| Exit[Exit]
     D --> E[4. Post Generation: Groq LLM]
     E --> F[5. Quality Check: Groq Evaluator]
-    F -->|Score >= 6| G[6. Image Generation: Pollinations.AI]
+    F -->|Score >= 6| G[6. Image Prompt Generation: Groq LLM]
     F -->|Score < 6| E
-    G --> H[7. LinkedIn Publisher]
-    H --> I[8. Log to Google Sheets]
-    I --> J[9. Email Notification: Gmail SMTP]
+    G --> H[7. Image Generation: Pollinations.AI]
+    H --> I[8. LinkedIn Publisher]
+    I --> J[9. Log to Google Sheets]
+    J --> K[10. Email Notification: Gmail SMTP]
 ```
 
 ---
@@ -28,7 +29,8 @@ flowchart TD
 - **Dynamic Topic Discovery**: Uses the Tavily API to search for the absolute latest trending news in AI and technology (no repetitive pre-defined prompts).
 - **In-Depth Research**: Summarizes content from multiple web sources using Tavily to provide rich context to the LLM.
 - **Double LLM Guardrail**: A primary Llama model writes the post, and a secondary review prompt grades it (1–10) to filter out generic content.
-- **AI Art Integration**: Auto-generates high-fidelity images matching the post topic using Pollinations.AI.
+- **Dynamic Image Prompt Generation**: Asks Groq to analyze the generated post and compose a custom, highly descriptive image prompt.
+- **AI Art Integration**: Generates matching high-fidelity images using Pollinations.AI based on the custom prompt.
 - **Self-Cleaning Tracker**: Keeps track of daily posts in a Google Sheet to prevent double-posting or duplicate topic selection.
 - **Fail-Safe Alerts**: Sends a detailed email containing the post contents (or the error stack trace if a failure occurs).
 
