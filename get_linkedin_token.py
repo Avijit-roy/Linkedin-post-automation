@@ -19,6 +19,13 @@ import urllib.parse
 
 # ── Fill these in before running (or set LINKEDIN_CLIENT_ID and LINKEDIN_CLIENT_SECRET env variables) ─
 import os
+from pathlib import Path
+from dotenv import load_dotenv
+
+# Load .env from the same directory
+_ENV_PATH = Path(__file__).parent / ".env"
+load_dotenv(dotenv_path=_ENV_PATH)
+
 CLIENT_ID     = os.environ.get("LINKEDIN_CLIENT_ID", "773k9a8lhm8m2a")
 CLIENT_SECRET = os.environ.get("LINKEDIN_CLIENT_SECRET", "")
 
@@ -183,10 +190,10 @@ def main():
 
     # Print final values
     print("\n" + "=" * 60)
-    print("   ✅ SUCCESS — Copy these into config.py")
+    print("   ✅ SUCCESS — Copy these into your .env file")
     print("=" * 60)
-    print(f'\nLINKEDIN_ACCESS_TOKEN = "{access_token}"')
-    print(f'\nLINKEDIN_PERSON_URN   = "{person_urn}"')
+    print(f'\nLINKEDIN_ACCESS_TOKEN="{access_token}"')
+    print(f'\nLINKEDIN_PERSON_URN="{person_urn}"')
     print("\n" + "=" * 60)
     print("⚠️  Token expires in 60 days. Re-run this script to refresh.")
     print("⚠️  Never commit these values to version control.")

@@ -8,3 +8,5 @@ gspread==6.0.2          # Google Sheets read/write
 google-auth==2.50.0     # Google Service Account authentication (replaces oauth2client on Python 3.13+)
 google-auth-oauthlib    # OAuth2 helpers for google-auth
 Pillow==11.1.0          # Image processing — 10.x does not build on Python 3.13
+python-dotenv==1.0.1    # Load environment variables from .env file
+

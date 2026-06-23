@@ -1,11 +1,11 @@
 # main.py
 # LinkedIn AI Daily Post Automation — Core Workflow
-# Version: 1.0.0
+# Version: 2.0.0
 #
 # Runs daily at the configured time and:
-#   1. Picks today's AI/Tech topic from a rotation list
+#   1. Discovers a random trending tech/AI topic via Tavily search
 #   2. Checks Google Sheets for duplicate (already posted today?)
-#   3. Researches the topic via DuckDuckGo Instant Answer API
+#   3. Researches the topic in depth via Tavily
 #   4. Generates a LinkedIn post via Groq (Llama 3 70B)
 #   5. Quality-checks the post via a second Groq call (scores 1–10)
 #   6. Generates an image via Pollinations.AI (Flux model, free)
@@ -63,48 +63,153 @@ logging.basicConfig(
 log = logging.getLogger(__name__)
 
 
+
 # ─────────────────────────────────────────────────────────────────────────────
-# TOPIC ROTATION
-# Cycles through daily using day-of-year % len(TOPICS) — never day-of-week.
-# Add or edit topics here. Each entry MUST have: topic, company, hashtags.
+# DYNAMIC TOPIC DISCOVERY via Tavily
+# Searches for genuinely trending tech/AI news each day and picks ONE random
+# topic from real headlines — no pre-defined list, always fresh content.
+# Fallback pool used only if Tavily is unavailable.
 # ─────────────────────────────────────────────────────────────────────────────
-TOPICS = [
-    {
-        "topic": "OpenAI latest news and GPT updates",
-        "company": "OpenAI",
-        "hashtags": "#OpenAI #GPT #ArtificialIntelligence #AI #MachineLearning",
-    },
-    {
-        "topic": "Google DeepMind and Gemini AI developments",
-        "company": "Google",
-        "hashtags": "#Google #Gemini #DeepMind #AI #Tech",
-    },
-    {
-        "topic": "Meta AI and Llama model updates",
-        "company": "Meta",
-        "hashtags": "#Meta #LlamaAI #AI #MachineLearning #OpenSource",
-    },
-    {
-        "topic": "Microsoft Azure AI and Copilot news",
-        "company": "Microsoft",
-        "hashtags": "#Microsoft #Copilot #AzureAI #AI #Productivity",
-    },
-    {
-        "topic": "Apple AI features and machine learning news",
-        "company": "Apple",
-        "hashtags": "#Apple #AppleIntelligence #AI #Tech #Innovation",
-    },
-    {
-        "topic": "NVIDIA AI chips and GPU technology news",
-        "company": "NVIDIA",
-        "hashtags": "#NVIDIA #GPU #AI #DeepLearning #Semiconductors",
-    },
-    {
-        "topic": "General AI breakthroughs and research news",
-        "company": "AI Industry",
-        "hashtags": "#AI #ArtificialIntelligence #MachineLearning #FutureOfWork #Tech",
-    },
+
+# Broad discovery queries rotated randomly for maximum variety
+_DISCOVERY_QUERIES = [
+    "latest AI breakthroughs 2026",
+    "biggest tech discoveries this week 2026",
+    "new machine learning research announcements 2026",
+    "quantum computing news 2026",
+    "robotics AI breakthrough recent 2026",
+    "semiconductor chip technology news 2026",
+    "space tech and satellite AI news 2026",
+    "biotech AI drug discovery news 2026",
+    "autonomous vehicles self-driving AI news 2026",
+    "generative AI new model release 2026",
+    "cybersecurity AI threat detection news 2026",
+    "climate tech AI innovation news 2026",
+    "AR VR mixed reality technology news 2026",
+    "large language model LLM research news 2026",
+    "open source AI model release 2026",
 ]
+
+# Fallback topics used only when Tavily is completely unreachable
+_FALLBACK_TOPICS = [
+    {"topic": "AI agents transforming software development workflows", "company": "AI Industry", "hashtags": "#AIAgents #AI #SoftwareDev #FutureOfWork #Tech"},
+    {"topic": "Quantum computing reaching commercial viability milestones", "company": "Tech Industry", "hashtags": "#QuantumComputing #Tech #Innovation #FutureOfWork #AI"},
+    {"topic": "Open-source AI models challenging proprietary giants", "company": "AI Industry", "hashtags": "#OpenSource #AI #MachineLearning #LLM #Tech"},
+    {"topic": "AI-powered drug discovery accelerating medical breakthroughs", "company": "BioTech AI", "hashtags": "#AI #BioTech #HealthTech #DrugDiscovery #Innovation"},
+    {"topic": "Edge AI bringing intelligence to everyday devices", "company": "Tech Industry", "hashtags": "#EdgeAI #AI #IoT #Semiconductors #Innovation"},
+]
+
+
+def _extract_hashtags(topic_title: str) -> str:
+    """Auto-generate relevant hashtags from a topic title string."""
+    title_lower = topic_title.lower()
+    tags = ["#Tech", "#Innovation"]
+
+    keyword_map = [
+        (["openai", "gpt", "chatgpt"], ["#OpenAI", "#GPT", "#AI"]),
+        (["google", "gemini", "deepmind"], ["#Google", "#DeepMind", "#AI"]),
+        (["meta", "llama"], ["#Meta", "#AI", "#OpenSource"]),
+        (["microsoft", "copilot", "azure"], ["#Microsoft", "#AI", "#Copilot"]),
+        (["apple", "siri"], ["#Apple", "#AI", "#AppleIntelligence"]),
+        (["nvidia", "gpu", "cuda"], ["#NVIDIA", "#GPU", "#AI", "#DeepLearning"]),
+        (["quantum"], ["#QuantumComputing", "#FutureOfWork"]),
+        (["robot", "autonomous"], ["#Robotics", "#AI", "#Automation"]),
+        (["drug", "biotech", "medicine", "health"], ["#BioTech", "#HealthTech", "#AI"]),
+        (["chip", "semiconductor"], ["#Semiconductors", "#AI"]),
+        (["cyber", "security"], ["#Cybersecurity", "#AI"]),
+        (["climate", "energy", "green"], ["#ClimateTech", "#GreenTech", "#AI"]),
+        (["space", "satellite"], ["#SpaceTech", "#AI"]),
+        (["ar", "vr", "mixed reality", "metaverse"], ["#AR", "#VR", "#Metaverse", "#AI"]),
+        (["llm", "language model", "generative"], ["#GenerativeAI", "#LLM", "#AI"]),
+        (["machine learning", "deep learning"], ["#MachineLearning", "#DeepLearning", "#AI"]),
+    ]
+    for keywords, extra_tags in keyword_map:
+        if any(kw in title_lower for kw in keywords):
+            tags.extend(extra_tags)
+            break
+    else:
+        tags.extend(["#AI", "#ArtificialIntelligence", "#MachineLearning"])
+
+    # Deduplicate while preserving order
+    seen = set()
+    unique_tags = []
+    for t in tags:
+        if t not in seen:
+            seen.add(t)
+            unique_tags.append(t)
+
+    return " ".join(unique_tags[:6])
+
+
+def discover_topic_via_tavily() -> dict:
+    """Use Tavily to find a genuinely trending tech/AI topic right now.
+
+    Picks a random discovery query, fetches top news results, and selects
+    one result at random to use as today's post topic. This ensures every
+    post is about something real and currently in the news cycle.
+
+    Returns a dict with keys: topic, company, hashtags.
+    Falls back to a random item from _FALLBACK_TOPICS on any error.
+    """
+    query = random.choice(_DISCOVERY_QUERIES)
+    log.info(f"🔎 Discovering topic via Tavily (query: '{query}')...")
+
+    try:
+        payload = {
+            "api_key": config.TAVILY_API_KEY,
+            "query": query,
+            "search_depth": "basic",
+            "topic": "news",
+            "max_results": 10,
+            "include_answer": False,
+        }
+        r = requests.post(
+            "https://api.tavily.com/search",
+            json=payload,
+            timeout=20,
+        )
+        r.raise_for_status()
+        results = r.json().get("results", [])
+
+        if not results:
+            raise ValueError("Tavily returned zero results for discovery query.")
+
+        # Pick a random result from the top 10 for maximum variety
+        chosen = random.choice(results)
+        topic_title = chosen.get("title", "").strip()
+        raw_content = chosen.get("content", "").strip()
+
+        # Build a clean, descriptive topic label (cap at 120 chars)
+        if len(topic_title) > 120:
+            topic_title = topic_title[:117] + "..."
+
+        # Try to extract a company/org name from the title or content
+        company = "Tech Industry"
+        company_keywords = [
+            "OpenAI", "Google", "Meta", "Microsoft", "Apple", "NVIDIA", "Amazon", "Tesla",
+            "DeepMind", "Anthropic", "Mistral", "xAI", "Groq", "IBM", "Samsung", "Intel",
+            "Qualcomm", "AMD", "SpaceX", "NASA", "MIT", "Stanford", "Harvard",
+        ]
+        combined = topic_title + " " + raw_content
+        for kw in company_keywords:
+            if kw.lower() in combined.lower():
+                company = kw
+                break
+
+        hashtags = _extract_hashtags(topic_title)
+        log.info(f"✅ Topic discovered: '{topic_title}' (company: {company})")
+        return {"topic": topic_title, "company": company, "hashtags": hashtags}
+
+    except requests.exceptions.Timeout:
+        log.warning("⚠️ Tavily topic discovery timed out. Using fallback topic.")
+    except requests.exceptions.RequestException as e:
+        log.warning(f"⚠️ Tavily topic discovery request failed: {e}. Using fallback topic.")
+    except Exception as e:
+        log.warning(f"⚠️ Tavily topic discovery error: {e}. Using fallback topic.")
+
+    fallback = random.choice(_FALLBACK_TOPICS)
+    log.info(f"📋 Using fallback topic: '{fallback['topic']}'")
+    return fallback
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -192,63 +297,75 @@ def send_email(subject: str, body: str) -> None:
 
 
 # ─────────────────────────────────────────────────────────────────────────────
-# 5. RESEARCH
-# Queries DuckDuckGo Instant Answer API — free, no key required.
-# Falls back to a plain topic description if the API returns empty data.
+# 5. RESEARCH via Tavily
+# Performs a deep Tavily search on the discovered topic to gather rich,
+# up-to-date context for the LinkedIn post generation prompt.
+# Falls back to a concise description if Tavily is unavailable.
 # ─────────────────────────────────────────────────────────────────────────────
 def research_topic(topic, company):
-    """Fetch research context from DuckDuckGo Instant Answer API.
+    """Fetch in-depth research context from Tavily Search API.
 
+    Uses search_depth='advanced' to get full content from top sources.
     Returns a formatted summary string to pass into the post generation prompt.
-    Falls back to a generic topic description if DDG returns insufficient data.
+    Falls back to a generic topic description if Tavily returns insufficient data.
     """
     try:
-        url = "https://api.duckduckgo.com/"
-        params = {
-            "q": f"{topic} 2026",
-            "format": "json",
-            "no_html": 1,
-            "skip_disambig": 1,
+        payload = {
+            "api_key": config.TAVILY_API_KEY,
+            "query": f"{topic} latest news breakthroughs 2025 2026",
+            "search_depth": "advanced",
+            "topic": "news",
+            "max_results": 5,
+            "include_answer": True,
+            "include_raw_content": False,
         }
-        r = requests.get(url, params=params, timeout=15)
+        r = requests.post(
+            "https://api.tavily.com/search",
+            json=payload,
+            timeout=25,
+        )
         r.raise_for_status()
         data = r.json()
 
         lines = []
-        if data.get("Abstract"):
-            lines.append("Summary: " + data["Abstract"])
-        if data.get("Answer"):
-            lines.append("Answer: " + data["Answer"])
-        if data.get("Definition"):
-            lines.append("Definition: " + data["Definition"])
-        for rt in data.get("RelatedTopics", [])[:5]:
-            if isinstance(rt, dict) and rt.get("Text"):
-                lines.append("Related: " + rt["Text"])
 
-        summary = "\n".join(lines)
+        # Tavily's synthesised answer is the best starting point
+        if data.get("answer"):
+            lines.append("Key Insight: " + data["answer"])
 
-        # Fall back if DDG returned too little content
-        if len(summary) < 30:
+        # Pull content snippets from individual result pages
+        for result in data.get("results", [])[:5]:
+            title   = result.get("title", "").strip()
+            content = result.get("content", "").strip()
+            url     = result.get("url", "")
+            if content:
+                snippet = content[:300].rstrip() + ("..." if len(content) > 300 else "")
+                lines.append(f"[{title}] {snippet}  (source: {url})")
+
+        summary = "\n\n".join(lines)
+
+        # Fall back if Tavily returned too little content
+        if len(summary) < 50:
             summary = (
                 f"Topic: {topic}\n"
                 f"Company: {company}\n"
-                f"Write about latest 2026 trends, announcements, and industry impact."
+                f"Write about the latest 2025-2026 trends, announcements, and industry impact."
             )
 
-        log.info(f"🔍 Research done ({len(lines)} results fetched)")
+        log.info(f"🔍 Tavily research done ({len(data.get('results', []))} sources, answer={'yes' if data.get('answer') else 'no'})")
         return summary
 
     except requests.exceptions.Timeout:
-        log.warning("⚠️ DuckDuckGo request timed out. Using fallback context.")
+        log.warning("⚠️ Tavily research request timed out. Using fallback context.")
     except requests.exceptions.RequestException as e:
-        log.warning(f"⚠️ DuckDuckGo request failed: {e}. Using fallback context.")
+        log.warning(f"⚠️ Tavily research request failed: {e}. Using fallback context.")
     except Exception as e:
-        log.warning(f"⚠️ Research step error: {e}. Using fallback context.")
+        log.warning(f"⚠️ Tavily research step error: {e}. Using fallback context.")
 
     return (
         f"Topic: {topic}\n"
         f"Company: {company}\n"
-        f"Write about the latest 2026 developments and their impact on the AI industry."
+        f"Write about the latest 2025-2026 developments and their impact on the AI and tech industry."
     )
 
 
@@ -513,16 +630,15 @@ def run_workflow():
     log.info("=" * 50)
     log.info("▶ Starting LinkedIn automation workflow")
 
-    # ── Select today's topic ──────────────────────────────────────────────────
-    today     = datetime.now().strftime("%Y-%m-%d")
-    day_index = datetime.now().timetuple().tm_yday % len(TOPICS)
-    topic_data = TOPICS[day_index]
+    # ── Discover today's topic dynamically via Tavily ─────────────────────────
+    today      = datetime.now().strftime("%Y-%m-%d")
+    topic_data = discover_topic_via_tavily()
 
     topic    = topic_data["topic"]
     company  = topic_data["company"]
     hashtags = topic_data["hashtags"]
 
-    log.info(f"📅 Today: {today} | Topic: {company}")
+    log.info(f"📅 Today: {today} | Topic: {topic} | Company: {company}")
 
     # ── Duplicate check ───────────────────────────────────────────────────────
     if is_duplicate(today):
