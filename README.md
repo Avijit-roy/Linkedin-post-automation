@@ -82,6 +82,8 @@ Make sure the path matches `GOOGLE_CREDENTIALS_FILE` in your `.env`.
 | `POLLINATIONS_API_KEY`| Pollinations.AI Key | `sk_...` |
 | `LINKEDIN_ACCESS_TOKEN`| 60-day User Access Token | (See token generation below) |
 | `LINKEDIN_PERSON_URN` | Your Person/Member URN | `urn:li:person:XXXXX` |
+| `LINKEDIN_CLIENT_ID` | LinkedIn Developer App Client ID | `773k9a...` |
+| `LINKEDIN_CLIENT_SECRET`| LinkedIn Developer App Client Secret | `xxxxxx` |
 | `GOOGLE_SHEET_ID` | Google Sheet spreadsheet ID | `1VH...` |
 | `GOOGLE_CREDENTIALS_FILE`| Relative path to Service Account JSON | `credentials/your-key.json` |
 | `SHEET_NAME` | Name of the sheet/tab to log runs | `Posts` |
@@ -89,6 +91,8 @@ Make sure the path matches `GOOGLE_CREDENTIALS_FILE` in your `.env`.
 | `GMAIL_RECEIVER` | Receiver email address | `you@gmail.com` |
 | `GMAIL_APP_PASSWORD` | Google Account App Password | `xxxx xxxx xxxx xxxx` |
 | `POST_TIME` | Scheduled posting time (24h) | `10:00` |
+| `MAX_RETRIES` | Max attempts to generate post (if low quality) | `3` |
+| `QUALITY_MIN_SCORE` | Minimum score (1-9) to pass quality check | `6` |
 
 ---
 
