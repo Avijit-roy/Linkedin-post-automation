@@ -483,13 +483,68 @@ def quality_check(post_text):
     return result
 
 
+def generate_image_prompt(post_text):
+    """Generate a descriptive image prompt based on the generated post content using Groq."""
+    try:
+        headers = {
+            "Authorization": f"Bearer {config.GROQ_API_KEY}",
+            "Content-Type": "application/json",
+        }
+        body = {
+            "model": "llama-3.3-70b-versatile",
+            "max_tokens": 150,
+            "temperature": 0.7,
+            "messages": [
+                {
+                    "role": "system",
+                    "content": (
+                        "You are an expert AI image prompt engineer. "
+                        "Your task is to generate a highly detailed, visually appealing, and professional image prompt for a text-to-image generator (Flux model). "
+                        "The image should perfectly complement the LinkedIn post provided. "
+                        "Always design it to be a professional corporate/technology style, futuristic, clean, high quality, with no text, no logos, no typography, and no watermarks. "
+                        "Respond ONLY with the raw prompt text. Do not include any quotes, intro, explanation, or conversational text."
+                    ),
+                },
+                {
+                    "role": "user",
+                    "content": f"Create an image generation prompt based on this LinkedIn post:\n\n{post_text}",
+                },
+            ],
+        }
+        r = requests.post(
+            "https://api.groq.com/openai/v1/chat/completions",
+            headers=headers,
+            json=body,
+            timeout=20,
+        )
+        r.raise_for_status()
+        prompt = r.json()["choices"][0]["message"]["content"].strip()
+        
+        # Clean up any potential markdown wraps or extra commentary the LLM might have returned
+        prompt = prompt.replace('"', '').replace("'", "")
+        if prompt.lower().startswith("prompt:"):
+            prompt = prompt[7:].strip()
+            
+        # Ensure it has the essential quality tags
+        fallback_suffix = ", professional technology style, futuristic digital illustration, cinematic lighting, 4K quality, no text, no logos, no watermarks"
+        if not any(tag in prompt.lower() for tag in ["no text", "no logos"]):
+            prompt += fallback_suffix
+            
+        log.info(f"🎨 Generated image prompt: {prompt}")
+        return prompt
+        
+    except Exception as e:
+        log.warning(f"⚠️ Failed to generate custom image prompt: {e}. Using fallback prompt.")
+        return f"Futuristic technology visual, modern professional design, digital innovation theme, cinematic lighting, 4K, no text, no logos"
+
+
 # ─────────────────────────────────────────────────────────────────────────────
 # 8. IMAGE GENERATION
 # Pollinations.AI — authenticated Flux API via gen.pollinations.ai.
 # GET endpoint returns image bytes directly; Authorization header carries the key.
 # Resolution: 1200×628px (LinkedIn optimal). Raises on failure — critical step.
 # ─────────────────────────────────────────────────────────────────────────────
-def generate_image(company, topic):
+def generate_image(prompt):
     """Generate a professional AI image via Pollinations.AI authenticated Flux API.
 
     Calls GET https://gen.pollinations.ai/image/{prompt}?model=flux&...
@@ -498,11 +553,6 @@ def generate_image(company, topic):
     Returns tuple: (image_bytes, image_url).
     Raises Exception on failure (critical step — halts workflow).
     """
-    prompt = (
-        f"{company} artificial intelligence technology, futuristic digital landscape, "
-        f"professional corporate style, blue and white colour scheme, cinematic lighting, "
-        f"4K quality, no text, no logos, no watermarks"
-    )
 
     seed = random.randint(1, 99999)
     encoded_prompt = requests.utils.quote(prompt)
@@ -698,7 +748,8 @@ def run_workflow():
             return
 
         # ── Step 4: Generate image ────────────────────────────────────────────
-        image_bytes, image_url = generate_image(company, topic)
+        image_prompt = generate_image_prompt(post_text)
+        image_bytes, image_url = generate_image(image_prompt)
 
         # ── Step 5: Upload image to LinkedIn ──────────────────────────────────
         image_asset = linkedin_upload_image(image_bytes)
