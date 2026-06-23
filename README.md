@@ -7,19 +7,81 @@ A fully automated Python system that researches trending topics daily, generates
 ## 🛠️ Architecture & Workflow
 
 ```mermaid
-flowchart TD
-    A[Cron Job / GitHub Action] --> B[1. Topic Discovery: Tavily AI]
-    B --> C[2. Duplicate Check: Google Sheets]
-    C -->|Not Posted| D[3. Deep Research: Tavily AI]
-    C -->|Already Posted| Exit[Exit]
-    D --> E[4. Post Generation: Groq LLM]
-    E --> F[5. Quality Check: Groq Evaluator]
-    F -->|Score >= 6| G[6. Image Prompt Generation: Groq LLM]
-    F -->|Score < 6| E
-    G --> H[7. Image Generation: Pollinations.AI]
-    H --> I[8. LinkedIn Publisher]
-    I --> J[9. Log to Google Sheets]
-    J --> K[10. Email Notification: Gmail SMTP]
+graph TD
+    subgraph Trigger
+        Cron[GitHub Actions Cron / Local Daemon]
+    end
+
+    subgraph Config & Environment
+        Env[".env File (Secrets & Config)"] --> Config[config.py Loader & Validator]
+    end
+
+    subgraph Core Automation Flow [main.py]
+        Start([Start Daily Workflow])
+        Discovery[1. Topic Discovery<br/>Tavily News Search]
+        DupCheck[2. Duplicate Check<br/>Read Column A]
+        Research[3. Deep Research<br/>Tavily Advanced Search]
+        GenPost[4. Post Generation<br/>Groq Llama-3.3-70B]
+        QualityCheck[5. Quality Evaluator<br/>Groq low-temp scoring]
+        GenPrompt[6. Custom Image Prompt<br/>Groq context generation]
+        GenImage[7. Image Generation<br/>Pollinations.AI Flux API]
+        UploadImage[8. Initialize & Upload Image<br/>LinkedIn Images API]
+        PublishPost[9. Publish Post with Image<br/>LinkedIn Posts API]
+        LogRun[10. Append Log Row<br/>Google Sheets]
+        Notify[11. Email Alert<br/>Gmail SMTP SSL]
+    end
+
+    subgraph External APIs & Services
+        TavilyAPI[(Tavily AI API)]
+        SheetsAPI[(Google Sheets API)]
+        GroqAPI[(Groq Cloud API)]
+        PollinationsAPI[(Pollinations.AI)]
+        LinkedinAPI[(LinkedIn API)]
+        GmailSMTP[(Gmail SMTP Server)]
+    end
+
+    %% Flow connections
+    Cron --> Start
+    Config -.-> Start
+    
+    Start --> Discovery
+    Discovery <-->|Fetch random trending news| TavilyAPI
+    
+    Discovery --> DupCheck
+    DupCheck <-->|Query check dates| SheetsAPI
+    
+    DupCheck -->|Already Posted| Skip[Skip & Exit]
+    DupCheck -->|Not Posted| Research
+    
+    Research <-->|Fetch deep article summary| TavilyAPI
+    
+    Research --> GenPost
+    GenPost <-->|Prompt with research| GroqAPI
+    
+    GenPost --> QualityCheck
+    QualityCheck <-->|Grade 1-10| GroqAPI
+    
+    QualityCheck -->|Score < Min Score| GenPost
+    QualityCheck -->|Score >= Min Score| GenPrompt
+    
+    GenPrompt <-->|Generate visual prompt| GroqAPI
+    
+    GenPrompt --> GenImage
+    GenImage <-->|Fetch Flux image bytes| PollinationsAPI
+    
+    GenImage --> UploadImage
+    UploadImage <-->|Upload image bytes| LinkedinAPI
+    
+    UploadImage --> PublishPost
+    PublishPost <-->|Post commentary & image asset| LinkedinAPI
+    
+    PublishPost --> LogRun
+    LogRun --->|Log Success Status| SheetsAPI
+    
+    LogRun --> Notify
+    Notify --->|Send Status Report| GmailSMTP
+    
+    Notify --> End([End Workflow])
 ```
 
 ---
