@@ -1,9 +1,6 @@
 name: LinkedIn Post Automation
 
 on:
-  schedule:
-    # Run everyday at 4:30 AM UTC (10:00 AM IST)
-    - cron: "30 4 * * *"
   workflow_dispatch:
     # Allows manual trigger of the action from the GitHub UI
 
