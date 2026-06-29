@@ -254,9 +254,6 @@ python get_linkedin_token.py
 
 > This project does not expose a public REST API. It runs as an automation script locally or via GitHub Actions.
 
-## Screenshots & Demo
-
-![Demo placeholder](https://via.placeholder.com/1200x600?text=Automation+Demo+Coming+Soon)
 
 Suggested demo items:
 
