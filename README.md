@@ -2,8 +2,6 @@
 
 ![GitHub stars](https://img.shields.io/github/stars/your-username/linkedin-automation?style=social) ![GitHub forks](https://img.shields.io/github/forks/your-username/linkedin-automation?style=social) ![License](https://img.shields.io/badge/license-MIT-green) ![Python](https://img.shields.io/badge/Python-3.13%2B-blue) ![Status](https://img.shields.io/badge/status-active-success)
 
-<img src="https://via.placeholder.com/1200x320?text=LinkedIn+AI+Post+Automation" alt="Project banner placeholder" width="100%" />
-
 A polished AI-powered automation system that discovers fresh tech and AI trends, writes engaging LinkedIn posts, generates matching visuals, publishes them automatically, and tracks the workflow with logs and notifications.
 
 ## Table of Contents
